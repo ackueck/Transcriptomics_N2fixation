@@ -1,0 +1,50 @@
+#!/bin/bash
+#$ -cwd
+#$ -j y
+#$ -pe smp 12
+#$ -R y
+#$ -S /bin/bash
+#$ -V
+
+echo "job started"
+echo "Job ID:${JOB_ID}"
+hostname
+date
+
+while getopts l: option
+do
+case "${option}"
+in
+l) LIB=${OPTARG};;
+esac
+done
+
+
+echo "Creating folder scratch"
+mkdir /scratch/ckueck/tmp.${JOB_ID} -p
+cd /scratch/ckueck/tmp.${JOB_ID}
+
+
+echo "Copy files onto scratch"
+cp /opt/extern/bremen/symbiosis/ckueck/PATH/${LIB}_transdecoder/Trinity.fasta.transdecoder.pep /scratch/ckueck/tmp.${JOB_ID}
+cp /opt/extern/bremen/symbiosis/ckueck/PATH/DATABASE.FILE /scratch/ckueck/tmp.${JOB_ID}
+
+
+echo " Make database"
+makeblastdb -in DATABASE.FILE -dbtype prot
+
+echo "Run BLAST"
+blastp -query Trinity.fasta.transdecoder.pep -task blastp -db DATABASE.FILE-out ${LIB}_blastp_NAME.fasta -evalue 1 -outfmt "6 qseqid sseqid qcovs pident qseq sseq"
+
+echo "Remove everything unnessecary"
+rm /scratch/ckueck/tmp.${JOB_ID}/Trinity.fasta.transdecoder.pep
+rm /scratch/ckueck/tmp.${JOB_ID}/DATABASE.FILE
+
+echo "Copy back data"
+rsync -a /scratch/ckueck/tmp.${JOB_ID}/ /opt/extern/bremen/symbiosis/ckueck/PATH
+if [ "$?" -eq "0" ]; then
+  rm /scratch/ckueck/tmp.${JOB_ID} -R;
+  echo "Done"
+else
+ echo "Error while running rsync"
+fi
