@@ -1,0 +1,47 @@
+#!/bin/bash
+#$ -cwd
+#$ -j y
+#$ -pe smp 16
+#$ -R y
+#$ -S /bin/bash
+
+echo "Job ID: $JOB_ID"
+date
+hostname
+
+echo "### Creating folders"
+mkdir /scratch/ckueck/tmp.${JOB_ID}/ -p
+cd /scratch/ckueck/tmp.${JOB_ID}/
+
+echo "### Copying files"
+date
+cp /opt/extern/bremen/symbiosis/PATH/FILE.R1 /scratch/ckueck/tmp.${JOB_ID}/
+
+cp /opt/extern/bremen/symbiosis/PATH/FILE.R2 /scratch/ckueck/tmp.${JOB_ID}/
+
+cp /opt/extern/bremen/symbiosis/PATH/FILE.adapters /scratch/ckueck/tmp.${JOB_ID}/
+
+echo "Run bbduk (adapter trim left)"
+date
+
+bbduk.sh in1=FILE.R1 in2=FILE.R2 ref=FILE.adapters out1=FILE.triml.R1 out2=FILE.triml.R2 threads=16 mink=11 minlength=36 ktrim=l hdist=1
+
+
+echo "Run bbduk (adapter trim right + quality filtering)"
+bbduk.sh in1=FILE.triml.R1 in2=FILE.triml.R2 ref=FILE.adapters out1=FILE.trimlrfilter.R1 out2=FILE.trimlrfilter.R2 threads=16 mink=11 minlength=36 ktrim=l hdist=1 qtrim=rl trimq=2
+
+echo " Remove everything unnecessary"
+rm /scratch/ckueck/tmp.${JOB_ID}/FILE.R1
+
+rm /scratch/ckueck/tmp.${JOB_ID}/FILE.R2
+
+rm /scratch/ckueck/tmp.${JOB_ID}/FILE.adapters
+
+echo "Start copying files back"
+rsync -a /scratch/ckueck/tmp.${JOB_ID}/ /opt/extern/bremen/symbiosis/ckueck/PATH
+if [ "$?" -eq "0" ]; then
+  rm /scratch/ckueck/tmp.${JOB_ID} -R;
+  echo "Done"
+else
+  echo "Error while running rsync"
+fi
