@@ -1,0 +1,48 @@
+#!/bin/bash
+#$ -cwd
+#$ -j y
+#$ -pe smp 64
+#$ -R y
+#$ -S /bin/bash
+#$ -V
+
+echo "Job ID:${JOB_ID}"
+hostname
+date
+
+echo "Creating scratch folder"
+mkdir /scratch/ckueck/tmp.${JOB_ID}/ -p
+cd /scratch/ckueck/tmp.${JOB_ID}/
+
+echo "Copy files"
+
+cp /opt/extern/bremen/symbiosis/ckueck/PATH/FILE.trimlrfilter.R1 /scratch/ckueck/tmp.${JOB_ID}
+p /opt/extern/bremen/symbiosis/ckueck/PATH/FILE.trimlrfilter.R2 /scratch/ckueck/tmp.${JOB_ID}
+
+
+echo "#######################"
+echo "for-loop PhyloFlash"
+
+#/opt/extern/bremen/symbiosis/tools_HGV/phyloFlash/phyloFlash_makedb.pl --remote
+
+libs=$(echo LIBS)
+
+echo $libs
+
+for index in $libs;
+   do
+        /opt/extern/bremen/symbiosis/tools_HGV/phyloFlash/phyloFlash.pl -lib ${index} -read1 /scratch/ckueck/tmp.${JOB_ID}/${index}_FILE.trimlrfilter.R1 -read2 /scratch/ckueck/tmp.${JOB_ID}/${index}_FILE.trimlrfilter.R2 -interleaved -readlength ??? -CPUs 64 -skip_spades ;
+  done;
+
+echo "#######################"
+echo "Start copying files back"
+
+## Rsyncing back the data
+rsync -a /scratch/ckueck/tmp.${JOB_ID}/ /opt/extern/bremen/symbiosis/ckueck/PATH
+if [ "$?" -eq "0" ]; then
+  rm /scratch/ckueck/tmp.${JOB_ID} -R;
+  echo "Done"
+else
+  echo "Error while running rsync"
+fi
+
