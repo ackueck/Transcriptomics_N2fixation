@@ -1,0 +1,46 @@
+#!/bin/bash
+#$ -cwd
+#$ -j y
+#$ -pe smp 64
+#$ -V
+#$ -S /bin/bash
+#$ -q low.q
+
+
+while getopts l: option
+do
+case "${option}"
+in
+l) LIB=${OPTARG};;
+esac
+done
+
+echo "Job ID:${JOB_ID}"
+hostname
+date
+
+
+echo "Create a scratch folder"
+mkdir /scratch/ckueck/tmp.${JOB_ID}/ -p
+cd /scratch/ckueck/tmp.${JOB_ID}/
+
+echo "Copying files"
+cp /opt/extern/bremen/symbiosis/ckueck/PATH/${LIB}_FILE.trimlrfilter.R1 /scratch/ckueck/tmp.${JOB_ID}
+cp /opt/extern/bremen/symbiosis/ckueck/PATH/${LIB}_FILE.trimlrfilter.R2 /scratch/ckueck/tmp.${JOB_ID}
+
+
+echo "Start Trinity"
+Trinity --seqType fq --left ${LIB}_FILE.trimlrfilter.R1 --right ${LIB}_FILE.trimlrfilter.R2 --max_memory 250G --normalize_reads --output ${LIB}_trinity
+
+echo "Remove unneccessary files"
+rm /scratch/ckueck/tmp.${JOB_ID}/${LIB}_R1.trimlrfilter.fq.gz
+rm /scratch/ckueck/tmp.${JOB_ID}/${LIB}_R2.trimlrfilter.fq.gz
+
+echo "Start copying files back"
+rsync -a /scratch/ckueck/tmp.${JOB_ID}/ /opt/extern/bremen/symbiosis/ckueck/PATH
+if [ "$?" -eq "0" ]; then
+  rm /scratch/ckueck/tmp.${JOB_ID} -R;
+  echo "Done"
+else
+  echo "Error while running rsync"
+fi
