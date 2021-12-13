@@ -1,0 +1,46 @@
+#!/bin/bash
+#$ -cwd
+#$ -j y
+#$ -pe smp 64
+#$ -R y
+#$ -S /bin/bash
+
+echo "Job ID: $JOB_ID"
+date
+hostname
+
+echo "### Creating folders"
+mkdir /scratch/ckueck/tmp.${JOB_ID}/ -p
+cd /scratch/ckueck/tmp.${JOB_ID}/
+
+echo "### Copying files"
+date
+
+echo "copy files onto scratch"
+cp /opt/extern/bremen/symbiosis/PATH/FILE /scratch/ckueck/tmp.${JOB_ID}
+
+echo "defining variable"
+i=$(echo VARIABLE)
+
+echo $i
+
+echo "concatenate"
+echo "### cat AA"
+
+cat *.fasta >> ${i}_FILE
+gzip ${i}_FILE
+
+
+
+echo " Remove everything unnecessary"
+rm /scratch/ckueck/tmp.${JOB_ID}/FILE
+
+
+echo "Start copying files back"
+rsync -a /scratch/ckueck/tmp.${JOB_ID}/ /opt/extern/bremen/symbiosis/ckueck/PATH
+if [ "$?" -eq "0" ]; then
+  rm /scratch/ckueck/tmp.${JOB_ID} -R;
+  echo "Done"
+else
+  echo "Error while running rsync"
+fi
