@@ -1,0 +1,55 @@
+#!/bin/bash
+#$ -cwd
+#$ -j y
+#$ -pe smp 12
+#$ -V
+#$ -S /bin/bash
+
+while getopts l:s: option
+do
+case "${option}"
+in
+l) LIB=${OPTARG};;
+s) SPEC=${OPTARG};;
+esac
+done
+
+echo "job started"
+echo "Job ID:${JOB_ID}"
+hostname
+date
+
+echo "Create a scratch folder"
+mkdir /scratch/ckueck/tmp.${JOB_ID} -p
+cd /scratch/ckueck/tmp.${JOB_ID}
+
+echo "Copy over the assemblies"
+cp /opt/extern/bremen/symbiosis/ckueck/PATH/trinity_${LIB}/FILE /scratch/ckueck/tmp.${JOB_ID}
+
+echo "Copy over the raw reads"
+cp /opt/extern/bremen/symbiosis/PATH/${SPEC}_FILE.R1 /scratch/ckueck/tmp.${JOB_ID}
+cp /opt/extern/bremen/symbiosis/PATH/${SPEC}_FILE.R2 /scratch/ckueck/tmp.${JOB_ID}
+
+#echo "Running Transrate"
+#transrate --assembly Trinity.fasta --left ${SPEC}_R1*.fastq.gz --right ${SPEC}_R2*.fastq.gz --output ${LIB}_transrate --threads 12
+
+echo "1. Building the bowtie2 index"
+bowtie2-build FILE FILE
+
+echo "2. Running bowtie2"
+# -p CPUs given; -q that file is in fastq --no-unal suppress sam record; -k make 20 searches for alignment; -x Trinity assembly input file; -1/-2 raw file inpit files ; > the stats putput file; -@ allocate additional CPU; -Sb gnored for compatibility with previous samtools versions +output in bam; -o output file
+bowtie2 -p 12 -q --no-unal -k 20 -x FILE -1 ${SPEC}_FILE.R1 -2 ${SPEC}_FILE.R2 > ${SPEC}_align_stats.txt| samtools view -Sb -o ${SPEC}_bowtie2.bam
+
+echo "Rsyncing back data and deleting unnecessary files"
+rm /scratch/ckueck/tmp.${JOB_ID}/FILE
+rm /scratch/ckueck/tmp.${JOB_ID}/${SPEC}_FILE.R1
+rm /scratch/ckueck/tmp.${JOB_ID}/${SPEC}_FILE.R2
+mkdir /opt/extern/bremen/symbiosis/ckueck/PATH/trinity_${LIB}
+mkdir /opt/extern/bremen/symbiosis/ckueck/PATH/trinity_${LIB}/stats
+rsync -a /scratch/ckueck/tmp.${JOB_ID}/ /opt/extern/bremen/symbiosis/ckueck/PATH/trinity_${LIB}/stats
+if [ "$?" -eq "0" ]; then
+  rm /scratch/ckueck/tmp.${JOB_ID} -R;
+  echo "Done"
+else
+  echo "Error while running rsync"
+fi
