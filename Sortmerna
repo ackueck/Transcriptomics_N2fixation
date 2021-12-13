@@ -1,0 +1,85 @@
+#!/bin/bash
+#$ -cwd
+#$ -j y
+#$ -pe smp 64
+#$ -R y
+#$ -S /bin/bash
+#$ -V
+
+
+echo "job started"
+echo "Job ID:${JOB_ID}"
+hostname
+date
+
+
+echo "##########################"
+echo "Create a scratch folder"
+mkdir /scratch/ckueck/tmp.${JOB_ID} -p
+cd /scratch/ckueck/tmp.${JOB_ID}
+
+
+## Copy data to scratch
+echo "########################"
+echo "Copy over the trimmed and quality filtered reads"
+
+libs=$(echo LIBS)
+
+echo $libs
+
+for index in $libs;
+        do
+                cp /opt/extern/bremen/symbiosis/ckueck/PATH/${index}_FILE.trimlrfilter.R1 /scratch/ckueck/tmp.${JOB_ID};
+                cp /opt/extern/bremen/symbiosis/ckueck/PATH/${index}_FILE.trimlrfilter.R2 /scratch/ckueck/tmp.${JOB_ID};
+        done;
+
+
+echo "#####################"
+echo "Split interleaved reads for  sortmerna"
+
+
+for index in $libs; 
+ do
+                        reformat.sh in1=${index}_FILE.trimlrfilter.R1 in2=${index}_FILE.trimlrfilter.R2 out=${index}_trimlrfilter.fastq;
+        done;
+
+
+echo "########################"
+echo "Indexing the databases"
+/opt/extern/bremen/symbiosis/tools_HGV/indexdb_rna --ref /opt/extern/bremen/symbiosis/ckueck/PATH/DATABASE,/opt/extern/bremen/symbiosis/ckueck/PATH/DATABASE
+
+
+echo "########################"
+echo "Running sortmerna"
+libs=$(echo LIBS)
+
+echo $libs
+
+for index in $libs; 
+        do
+                        /opt/extern/bremen/symbiosis/tools_HGV/sortmerna --ref /opt/extern/bremen/symbiosis/ckueck/PATH/DATABASE --reads ${index}_trimlrfilter.fastq —aligned ${index}_sortmerna_RNA.fastq --other ${index}_sortmerna_noRNA.fastq  --fastx --log  --num_alignments 1 --paired_in -a 64;
+       done;
+
+echo "##################################"
+echo " Remove everything unnecessary"
+
+
+for index in $libs; 
+      do
+                rm /scratch/ckueck/tmp.${JOB_ID}/${index}_trimlrfilter.fastq;
+                rm /scratch/ckueck/tmp.${JOB_ID}/${index}_FILE.trimlrfilter:R1;
+                rm /scratch/ckueck/tmp.${JOB_ID}/${index}_FILE.trimlrfilter.R2;
+        done;
+
+
+echo "#######################"
+echo "Start copying files back"
+
+## Rsyncing back the data
+rsync -a /scratch/czeidler/tmp.${JOB_ID}/ /opt/extern/bremen/symbiosis/ckueck/PATH
+if [ "$?" -eq "0" ];then
+  rm /scratch/czeidler/tmp.${JOB_ID} -R;
+  echo "Done"
+else
+  echo "Error while running rsync"
+fi
