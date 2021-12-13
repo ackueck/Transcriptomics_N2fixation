@@ -1,0 +1,57 @@
+#!/bin/bash
+#$ -cwd
+#$ -j y
+#$ -pe smp 64
+#$ -R y
+#$ -S /bin/bash
+#$ -q low.q
+
+while getopts l:s: option
+do
+case "${option}"
+in
+l) LIB=${OPTARG};;
+s) SPEC=${OPTARG};;
+esac
+done
+
+echo "Job ID: $JOB_ID"
+date
+hostname
+
+echo "### Creating folders"
+mkdir /scratch/ckueck/tmp.${JOB_ID}/ -p
+cd /scratch/ckueck/tmp.${JOB_ID}/
+
+echo "### Copying files"
+date
+
+echo "copy files onto scratch"
+cp /opt/extern/bremen/symbiosis/ckueck/PATH/${LIB}_FILE.trimlrfilter.R1 /scratch/ckueck/tmp.${JOB_ID}
+cp /opt/extern/bremen/symbiosis/ckueck/PATH/${LIB}_FILE.trimlrfilter.R2 /scratch/ckueck/tmp.${JOB_ID}
+cp /opt/extern/bremen/symbiosis/ckueck/PATH/${SPEC}_FILE.outmapping /scratch/ckueck/tmp.${JOB_ID}
+
+echo "### start bbmap"
+bbmap.sh in1=${LIB}_FILE.trimlrfilter.R1 in2=${LIB}_FILE.trimlrfilter.R2 ref=${SPEC}_FILE_outmapping outu=${LIB}_OUTMAPFILE1 outm=${LIB}_OUTMAPFILE2 covstats=${LIB}_covstats.txt  minid=0.70 -Xmx60g
+
+
+echo "### reformat"
+reformat.sh in=${LIB}_OUTMAPFILE1 out1=${LIB}_OUTMAPFILE1.R1 out2=${LIB}_OUTMAPFILE1.R2
+
+echo "### start phyloFlash"
+/opt/extern/bremen/symbiosis/tools_HGV/phyloFlash/phyloFlash.pl -lib ${LIB} -read1 ${LIB}_OUTMAPFILE1.R1 -read2 ${LIB}_OUTMAPFILE1.R2 -interleaved -readlength ??? -CPUs 64 -skip_spades
+
+
+
+echo " Remove everything unnecessary"
+rm /scratch/ckueck/tmp.${JOB_ID}/${LIB}_FILE.trimlrfilter.R1
+rm /scratch/ckueck/tmp.${JOB_ID}/${LIB}_FILE.trimlrfilter.R2
+
+echo "Start copying files back"
+rsync -a /scratch/ckueck/tmp.${JOB_ID}/ /opt/extern/bremen/symbiosis/ckueck/PATH
+if [ "$?" -eq "0" ]; then
+  rm /scratch/ckueck/tmp.${JOB_ID} -R;
+  echo "Done"
+else
+  echo "Error while running rsync"
+fi
