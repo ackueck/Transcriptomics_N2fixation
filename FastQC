@@ -1,0 +1,36 @@
+#!/bin/bash
+#$ -S /bin/bash
+#$ -cwd
+#$ -j y # join stdout and stderr
+#$ -pe smp 12 # number of threads for parallel job
+#$ -V # pass environment variables to the job
+#$ -R y
+
+echo "job ID:${JOB_ID}"
+date
+hostname
+
+echo "### Creating folders"
+mkdir /scratch/ckueck/tmp.${JOB_ID} -p
+cd /scratch/ckueck/tmp.${JOB_ID}
+
+echo "### Copying files"
+date
+cp /opt/extern/bremen/symbiosis/PATH/FILE /scratch/ckueck/tmp.${JOB_ID}
+
+echo "### Run fastQC"
+date
+fastqc FILE
+
+
+echo " Remove everything unnecessary"
+rm /scratch/ckueck/tmp.${JOB_ID}/FILE
+
+echo "Start copying files back"
+rsync -a /scratch/ckueck/tmp.${JOB_ID}/ /opt/extern/bremen/symbiosis/ckueck/PATH
+if [ "$?" -eq "0" ]; then
+  rm /scratch/ckueck/tmp.${JOB_ID} -R;
+  echo "Done"
+else
+  echo "Error while running rsync"
+fi
