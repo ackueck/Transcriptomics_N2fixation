@@ -1,0 +1,43 @@
+#!/bin/bash
+#$ -cwd
+#$ -j y
+#$ -pe smp 16/64 ???
+#$ -R y
+#$ -S /bin/bash
+#$ -V
+
+echo "job started"
+echo "Job ID:${JOB_ID}"
+hostname
+date
+
+while getopts l: option
+do
+case "${option}"
+in
+l) LIB=${OPTARG};;
+esac
+done
+
+echo "Creating scratch folder"
+mkdir /scratch/ckueck/tmp.${JOB_ID} -p
+cd /scratch/ckueck/tmp.${JOB_ID}
+
+
+echo "Copy files onto scratch"
+cp /opt/extern/bremen/symbiosis/ckueck/PATH/trinity_${LIB}/FILE /scratch/ckueck/tmp.${JOB_ID}
+
+echo "Running BUSCO"
+busco --in FILE --lineage_dataset /opt/extern/bremen/symbiosis/ckueck/PATH/metazoa_odb10 --out ${LIB}_busco_metazoa_odb10 --mode tran --config /opt/extern/bremen/symbiosis/ckueck/PATH/myconfig.ini --cpu 16 --offline
+
+echo "Remove everything unnessecary"
+rm /scratch/ckueck/tmp.${JOB_ID}/FILE
+
+echo "Copy back data"
+rsync -a /scratch/ckueck/tmp.${JOB_ID}/ /opt/extern/bremen/symbiosis/ckueck/PATH
+if [ "$?" -eq "0" ]; then
+  rm /scratch/ckueck/tmp.${JOB_ID} -R;
+  echo "Done"
+else
+  echo "Error while running rsync"
+fi
