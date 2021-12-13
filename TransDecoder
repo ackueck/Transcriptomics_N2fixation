@@ -1,0 +1,50 @@
+#!/bin/bash
+#$ -cwd
+#$ -j y
+#$ -pe smp 12
+#$ -V
+#$ -S /bin/bash
+#$ -q low.q
+#$ -R y
+
+
+echo "job started"
+echo "Job ID:${JOB_ID}"
+hostname
+date
+
+while getopts l: option
+do
+case "${option}"
+in
+l) LIB=${OPTARG};;
+esac
+done
+
+echo "Creating scratch folder"
+mkdir /scratch/ckueck/tmp.${JOB_ID} -p
+cd /scratch/ckueck/tmp.${JOB_ID}
+
+
+echo "Copy files onto scratch"
+cp /opt/extern/bremen/symbiosis/ckueck/PATH/trinity_${LIB}/FILE /scratch/ckueck/tmp.${JOB_ID}
+
+
+echo "Step 1: extract the long open reading frames (ORFs at least 100 aa long)"
+TransDecoder.LongOrfs -t /scratch/ckueck/tmp.${JOB_ID}/FILE
+
+
+echo "Step 2: predict the likely coding regions"
+TransDecoder.Predict -t /scratch/ckueck/tmp.${JOB_ID}/FILE
+
+echo "remove FILE files before copying all data back"
+rm /scratch/ckueck/tmp.${JOB_ID}/FILE
+
+echo "Copy back data"
+rsync -a /scratch/ckueck/tmp.${JOB_ID}/ /opt/extern/bremen/symbiosis/ckueck/PATH/${LIB}_transdecoder
+if [ "$?" -eq "0" ]; then
+  rm /scratch/ckueck/tmp.${JOB_ID} -R;
+echo "Done"
+else
+  echo "Error while running rsync"
+fi
