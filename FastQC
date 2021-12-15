@@ -34,7 +34,3 @@ if [ "$?" -eq "0" ]; then
 else
   echo "Error while running rsync"
 fi
-
-
-just want to check this commit stuff
-now i want to check pull request 
